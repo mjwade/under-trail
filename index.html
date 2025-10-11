@@ -44,6 +44,7 @@
           const [musicEnabled, setMusicEnabled] = useState(false);
           const [sacrificeMode, setSacrificeMode] = useState(false);
           const [selectedForSacrifice, setSelectedForSacrifice] = useState(null);
+          const [showHowToPlay, setShowHowToPlay] = useState(false);
           const [epitaphChoices] = useState([
             'Here lies a true friend',
             'They died doing what they loved',
@@ -862,8 +863,9 @@
 `}
                     </pre>
                     <p className="text-xl mb-4">A Journey Through the Underground</p>
-                    <div className="mb-6">
-                      <label className="flex items-center justify-center gap-2 text-sm">
+                    
+                    <div className="mb-4">
+                      <label className="flex items-center justify-center gap-2 text-sm mb-4">
                         <input 
                           type="checkbox" 
                           checked={musicEnabled}
@@ -872,13 +874,123 @@
                         />
                         Enable Sound Effects
                       </label>
+                      
+                      <div className="bg-green-900 border border-green-600 p-3 mb-4 text-sm max-w-md mx-auto">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">💡</span>
+                          <div className="text-left">
+                            <strong>TIP:</strong> Show mercy to enemies to increase Determination and unlock the TRUE ENDING!
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <button 
-                      onClick={() => setGameState('setup')}
-                      className="bg-green-500 text-black px-8 py-3 text-xl hover:bg-green-400 border-2 border-green-300"
-                    >
-                      ► START GAME
-                    </button>
+                    
+                    <div className="flex gap-4 justify-center mb-4">
+                      <button 
+                        onClick={() => setGameState('setup')}
+                        className="bg-green-500 text-black px-8 py-3 text-xl hover:bg-green-400 border-2 border-green-300"
+                      >
+                        ► START GAME
+                      </button>
+                      <button 
+                        onClick={() => setShowHowToPlay(true)}
+                        className="bg-blue-700 text-green-400 px-6 py-3 text-lg hover:bg-blue-600 border-2 border-blue-500"
+                      >
+                        ℹ HOW TO PLAY
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {showHowToPlay && (
+                  <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+                    <div className="bg-black border-4 border-green-500 p-6 max-w-2xl w-full max-h-screen overflow-y-auto text-green-500" style={{boxShadow: '0 0 30px #0f0'}}>
+                      <h2 className="text-3xl mb-4 text-center">◆ HOW TO PLAY ◆</h2>
+                      
+                      <div className="space-y-4 text-left text-sm">
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">🎯 GOAL</h3>
+                          <p>Travel <strong>1200 meters</strong> through the Underground to escape with your party!</p>
+                        </section>
+
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">⚔️ COMBAT SYSTEM</h3>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li><strong className="text-red-400">FIGHT:</strong> Attack the enemy for gold, but lose determination (-10)</li>
+                            <li><strong className="text-blue-400">ACT:</strong> Interact with enemy to raise mercy chance</li>
+                            <li><strong className="text-yellow-400">MERCY:</strong> Spare enemy when mercy ≥ 60% to gain determination (+15)</li>
+                          </ul>
+                          <p className="mt-2 text-yellow-300">⚠️ Some enemies like Pizzaroni refuse mercy!</p>
+                        </section>
+
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">💚 DETERMINATION SYSTEM</h3>
+                          <p className="mb-2">Your moral choices affect your determination level:</p>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li><strong>Spare enemies:</strong> +15 determination</li>
+                            <li><strong>Fight enemies:</strong> -10 determination</li>
+                            <li><strong>Sacrifice party members:</strong> -30 determination</li>
+                            <li><strong>Lucky events:</strong> +10 determination</li>
+                          </ul>
+                          <p className="mt-2 italic">Higher determination = Better ending!</p>
+                        </section>
+
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">🏆 ENDINGS</h3>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li><strong className="text-yellow-300">TRUE ENDING:</strong> 70+ determination, all 4 party members alive</li>
+                            <li><strong className="text-blue-300">NEUTRAL ENDING:</strong> 50%+ party members alive</li>
+                            <li><strong className="text-red-300">HOLLOW ENDING:</strong> Only 1 survivor or low determination</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">🎮 ACTIONS</h3>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li><strong>Travel:</strong> Move forward (uses food, random events)</li>
+                            <li><strong>Rest:</strong> Heal party (+15 HP each, uses food)</li>
+                            <li><strong>Hunt:</strong> Minigame to gather food (needs 10 bullets)</li>
+                            <li><strong>Buy Food:</strong> Trade 10 gold for 20 food</li>
+                            <li><strong>Sacrifice:</strong> Trade a party member for +300m (needs 30 determination)</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">🦌 HUNTING CONTROLS</h3>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li><strong>Arrow Up/Down:</strong> Move hunter</li>
+                            <li><strong>Spacebar:</strong> Shoot</li>
+                            <li>Hit animals before time runs out!</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">💀 GAME OVER CONDITIONS</h3>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li>All party members die</li>
+                            <li>Food reaches 0 (starvation)</li>
+                          </ul>
+                        </section>
+
+                        <section>
+                          <h3 className="text-xl mb-2 text-green-300">💡 STRATEGY TIPS</h3>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            <li>Use ACT before trying to MERCY enemies</li>
+                            <li>Each enemy has a preferred ACT option</li>
+                            <li>Balance fighting (for gold) with sparing (for determination)</li>
+                            <li>Hunt regularly to maintain food supply</li>
+                            <li>Save sacrifices for emergencies—they cost a lot of determination!</li>
+                          </ul>
+                        </section>
+                      </div>
+
+                      <button 
+                        onClick={() => setShowHowToPlay(false)}
+                        className="w-full mt-6 bg-green-500 text-black px-8 py-3 text-xl hover:bg-green-400 border-2 border-green-300"
+                      >
+                        ✓ GOT IT!
+                      </button>
+                    </div>
                   </div>
                 )}
 
