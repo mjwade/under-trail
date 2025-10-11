@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnderTrail - A Journey Through the Underground</title>
+    <meta name="description" content="A retro RPG combining Oregon Trail survival with Undertale combat. Travel 1200m through the Underground!">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const UnderTrail = () => {
+          const [gameState, setGameState] = useState('title');
+          const [profession, setProfession] = useState('');
+          const [partyNames, setPartyNames] = useState(['', '', '', '']);
+          const [party, setParty] = useState([]);
+          const [day, setDay] = useState(1);
+          const [distance, setDistance] = useState(0);
+          const [food, setFood] = useState(0);
+          const [gold, setGold] = useState(0);
+          const [bullets, setBullets] = useState(0);
+          const [determination, setDetermination] = useState(50);
+          const [message, setMessage] = useState('');
+          const [encounter, setEncounter] = useState(null);
+          const [combatPhase, setCombatPhase] = useState('choice');
+          const [enemyHealth, setEnemyHealth] = useState(100);
+          const [mercyChance, setMercyChance] = useState(0);
+          const [gameLog, setGameLog] = useState([]);
+          const [actChoices, setActChoices] = useState([]);
+          const [musicEnabled, setMusicEnabled] = useState(false);
+          const [sacrificeMode, setSacrificeMode] = useState(false);
+          const [selectedForSacrifice, setSelectedForSacrifice] = useState(null);
+          const [epitaphChoices] = useState([
+            'Here lies a true friend',
+            'They died doing what they loved',
+            'Gone but not forgotten',
+            'A hero\'s sacrifice',
+            'They saved us all',
+            'Rest in pepperoni',
+            'Determination incarnate',
+            'They believed in mercy',
+            'A soul of pure kindness',
+            'Finally free from this nightmare'
+          ]);
+          
+          const canvasRef = useRef(null);
+          const huntCanvasRef = useRef(null);
+          
+          const huntStateRef = useRef({
+            active: false,
+            hunterY: 200,
+            animals: [],
+            projectiles: [],
+            score: 0,
+            timeLeft: 30,
+            bullets: 0
+          });
+          const keysPressed = useRef({});
+          const animationFrameRef = useRef(null);
+          const audioContextRef = useRef(null);
+
+          const professions = {
+            banker: { food: 60, gold: 100, bullets: 50, multiplier: 1 },
+            carpenter: { food: 50, gold: 50, bullets: 50, multiplier: 2 },
+            farmer: { food: 80, gold: 30, bullets: 40, multiplier: 3 }
+          };
+
+          const enemies = [
+            { 
+              name: 'Froggit', 
+              health: 30, 
+              attack: 5, 
+              ascii: '🐸',
+              intro: 'A wild Froggit appears! It doesn\'t seem to know why it\'s here.',
+              actOptions: [
+                { name: 'Compliment', effect: 'mercy', amount: 40, text: 'You compliment Froggit\'s eyes. It blushes happily!' },
+                { name: 'Threaten', effect: 'mercy', amount: 10, text: 'You threaten Froggit. It looks confused and scared.' },
+                { name: 'Joke', effect: 'mercy', amount: 25, text: 'You tell a joke. Froggit croaks with laughter!' }
+              ],
+              attacks: [
+                'Froggit hops around awkwardly!',
+                'Froggit creates a simple fly pattern!',
+                'Froggit doesn\'t want to fight...'
+              ],
+              spareText: 'Froggit bids you farewell and hops away peacefully.'
+            },
+            { 
+              name: 'Whimsun', 
+              health: 20, 
+              attack: 3,
+              ascii: '🦋',
+              intro: 'A timid Whimsun flutters nervously before you.',
+              actOptions: [
+                { name: 'Console', effect: 'mercy', amount: 50, text: 'You tell Whimsun everything will be okay. It feels better!' },
+                { name: 'Terrorize', effect: 'mercy', amount: 100, text: 'Whimsun is too scared to fight! It can be spared!' },
+                { name: 'Encourage', effect: 'mercy', amount: 35, text: 'You encourage Whimsun. It gains a bit of confidence!' }
+              ],
+              attacks: [
+                'Whimsun creates a butterfly pattern apologetically.',
+                'Whimsun is too nervous to attack effectively!',
+                'Whimsun says sorry as it creates a weak bullet!'
+              ],
+              spareText: 'Whimsun thanks you and flies away gratefully!'
+            },
+            { 
+              name: 'Moldsmal', 
+              health: 25, 
+              attack: 4,
+              ascii: '👾',
+              intro: 'Moldsmal wavers in front of you. It doesn\'t seem to have a brain.',
+              actOptions: [
+                { name: 'Imitate', effect: 'mercy', amount: 45, text: 'You wiggle like Moldsmal. It wiggles back excitedly!' },
+                { name: 'Flirt', effect: 'mercy', amount: 30, text: 'You flirt with Moldsmal. It doesn\'t understand but is flattered!' },
+                { name: 'Ignore', effect: 'mercy', amount: 20, text: 'You ignore Moldsmal. It continues existing.' }
+              ],
+              attacks: [
+                'Moldsmal wiggles and creates spores!',
+                'Moldsmal does what Moldsmal does!',
+                'Moldsmal secretes a harmless ooze.'
+              ],
+              spareText: 'Moldsmal slimes off into the distance.'
+            },
+            { 
+              name: 'Loox', 
+              health: 35, 
+              attack: 6,
+              ascii: '👁️',
+              intro: 'Loox stares at you judgmentally. Don\'t pick on them!',
+              actOptions: [
+                { name: 'Don\'t Pick On', effect: 'mercy', amount: 50, text: 'You refuse to pick on Loox. It\'s grateful for the respect!' },
+                { name: 'Pick On', effect: 'mercy', amount: -20, text: 'You pick on Loox. Its attack increased!' },
+                { name: 'Stare Back', effect: 'mercy', amount: 25, text: 'You have a staring contest. Loox respects your gaze.' }
+              ],
+              attacks: [
+                'Loox gazes at you with disdain!',
+                'Loox judges you with its eye!',
+                'Loox creates a hypnotic stare pattern!'
+              ],
+              spareText: 'Loox nods respectfully and floats away.'
+            },
+            { 
+              name: 'Vegetoid', 
+              health: 40, 
+              attack: 5,
+              ascii: '🥕',
+              intro: 'Vegetoid wants you to eat your greens!',
+              actOptions: [
+                { name: 'Eat Greens', effect: 'mercy', amount: 60, text: 'You eat the greens. Vegetoid is pleased! (Health +10)' },
+                { name: 'Refuse', effect: 'mercy', amount: 10, text: 'You refuse the vegetables. Vegetoid is disappointed.' },
+                { name: 'Dinner', effect: 'mercy', amount: 35, text: 'You promise to eat vegetables for dinner. Vegetoid approves!' }
+              ],
+              attacks: [
+                'Vegetoid throws healthy vegetables at you!',
+                'Vegetoid encourages a balanced diet!',
+                'Vegetoid creates a vitamin pattern!'
+              ],
+              spareText: 'Vegetoid is proud of you and leaves happily!'
+            },
+            { 
+              name: 'Pizzaroni', 
+              health: 50, 
+              attack: 8,
+              ascii: '🍕',
+              noMercy: true,
+              intro: 'Pizzaroni appears! It smells delicious but looks aggressive. This pizza shows NO MERCY!',
+              actOptions: [
+                { name: 'Compliment Toppings', effect: 'mercy', amount: 0, text: 'You compliment the toppings. Pizzaroni doesn\'t care!' },
+                { name: 'Ask for Recipe', effect: 'mercy', amount: 0, text: 'You ask for the recipe. Pizzaroni just stares at you coldly.' },
+                { name: 'Say You\'re Hungry', effect: 'mercy', amount: 0, text: 'You say you\'re hungry. Pizzaroni takes this as an insult!' }
+              ],
+              attacks: [
+                'Toast!',
+                'Toast!',
+                'Toast!'
+              ],
+              spareText: 'Pizzaroni refuses mercy and vanishes in a puff of flour!'
+            }
+          ];
+
+          const events = [
+            { text: 'You find a chest with supplies!', food: 10, gold: 5 },
+            { text: 'A kind monster shares their lunch.', food: 15 },
+            { text: 'You slip on a banana peel!', damage: 5, member: 'random' },
+            { text: 'You discover ancient gold coins!', gold: 15 },
+            { text: 'The cavern is cold and damp.', damage: 10, food: -5, member: 'all' },
+            { text: 'You find a healing spring!', heal: 20, member: 'all' },
+            { text: 'Your food spoils in the humidity.', food: -15 },
+            { text: 'A friendly monster tells jokes!', determination: 10 }
+          ];
+
+          const playSound = (frequency, duration, type = 'square', volume = 0.1) => {
+            if (!musicEnabled || !audioContextRef.current) return;
+            
+            const ctx = audioContextRef.current;
+            const oscillator = ctx.createOscillator();
+            const gainNode = ctx.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(ctx.destination);
+            
+            oscillator.frequency.value = frequency;
+            oscillator.type = type;
+            
+            gainNode.gain.setValueAtTime(volume, ctx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+            
+            oscillator.start(ctx.currentTime);
+            oscillator.stop(ctx.currentTime + duration);
+          };
+
+          const playMelody = (notes) => {
+            if (!musicEnabled || !audioContextRef.current) return;
+            
+            let time = 0;
+            notes.forEach(([freq, duration, type = 'square', volume = 0.1]) => {
+              setTimeout(() => playSound(freq, duration, type, volume), time);
+              time += duration * 1000;
+            });
+          };
+
+          const playShootSound = () => {
+            playSound(1200, 0.05, 'sawtooth', 0.15);
+            setTimeout(() => playSound(800, 0.05, 'sawtooth', 0.1), 50);
+          };
+
+          const playHitSound = () => {
+            playSound(600, 0.08, 'triangle', 0.2);
+            setTimeout(() => playSound(400, 0.08, 'triangle', 0.15), 80);
+          };
+
+          const playAttackSound = () => {
+            for (let i = 0; i < 3; i++) {
+              setTimeout(() => playSound(300 - i * 50, 0.1, 'sawtooth', 0.12), i * 100);
+            }
+          };
+
+          const playActSound = () => {
+            playMelody([
+              [523, 0.1, 'sine', 0.15],
+              [659, 0.1, 'sine', 0.15],
+              [784, 0.15, 'sine', 0.15]
+            ]);
+          };
+
+          const playMercySound = () => {
+            playMelody([
+              [523, 0.12, 'triangle', 0.15],
+              [659, 0.12, 'triangle', 0.15],
+              [784, 0.12, 'triangle', 0.15],
+              [1047, 0.25, 'triangle', 0.15]
+            ]);
+          };
+
+          const playSacrificeSound = () => {
+            playMelody([
+              [330, 0.3, 'sine', 0.2],
+              [311, 0.3, 'sine', 0.2],
+              [294, 0.3, 'sine', 0.2],
+              [262, 0.5, 'sine', 0.2]
+            ]);
+          };
+
+          const playToastSound = () => {
+            playMelody([
+              [659, 0.125, 'square', 0.2],
+              [784, 0.125, 'square', 0.2],
+              [988, 0.125, 'square', 0.2],
+              [1319, 0.125, 'square', 0.2],
+              [1568, 0.125, 'square', 0.2],
+              [1319, 0.125, 'square', 0.2],
+              [1568, 0.5, 'square', 0.2]
+            ]);
+          };
+
+          useEffect(() => {
+            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+          }, []);
+
+          useEffect(() => {
+            if (musicEnabled) {
+              if (gameState === 'title') {
+                playMelody([[440, 0.2, 'sine'], [523, 0.2, 'sine'], [659, 0.3, 'sine']]);
+              } else if (gameState === 'encounter') {
+                playMelody([[330, 0.15, 'square'], [392, 0.15, 'square'], [330, 0.15, 'square'], [392, 0.15, 'square']]);
+              }
+            }
+          }, [gameState, musicEnabled]);
+
+          useEffect(() => {
+            const handleKeyDown = (e) => {
+              keysPressed.current[e.key] = true;
+              
+              if (huntStateRef.current.active && e.key === ' ') {
+                e.preventDefault();
+                if (huntStateRef.current.bullets > 0) {
+                  huntStateRef.current.bullets--;
+                  huntStateRef.current.projectiles.push({
+                    id: Date.now() + Math.random(),
+                    x: 50,
+                    y: huntStateRef.current.hunterY
+                  });
+                  playShootSound();
+                }
+              }
+            };
+            
+            const handleKeyUp = (e) => {
+              keysPressed.current[e.key] = false;
+            };
+
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            
+            return () => {
+              window.removeEventListener('keydown', handleKeyDown);
+              window.removeEventListener('keyup', handleKeyUp);
+            };
+          }, []);
+
+          useEffect(() => {
+            if (gameState === 'traveling' && canvasRef.current) {
+              const canvas = canvasRef.current;
+              const ctx = canvas.getContext('2d');
+              drawTravelScreen(ctx);
+            }
+          }, [gameState, distance, day]);
+
+          const drawTravelScreen = (ctx) => {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 800, 200);
+            ctx.fillStyle = '#0f0';
+            ctx.font = '12px monospace';
+            
+            for (let i = 0; i < 10; i++) {
+              const y = i * 40 + (distance % 40);
+              ctx.fillText('|', 390, y);
+              ctx.fillText('|', 410, y);
+            }
+            
+            ctx.fillText('  ___', 360, 100);
+            ctx.fillText(' |___|', 355, 115);
+            ctx.fillText('  O O', 360, 130);
+          };
+
+          const addLog = (text) => {
+            setGameLog(prev => [...prev.slice(-4), text]);
+          };
+
+          const startGame = () => {
+            const prof = professions[profession];
+            const newParty = partyNames.map((name, i) => ({
+              name: name || `Person ${i + 1}`,
+              health: 100,
+              alive: true,
+              epitaph: null
+            }));
+            
+            setParty(newParty);
+            setFood(prof.food);
+            setGold(prof.gold);
+            setBullets(prof.bullets);
+            setGameState('traveling');
+            setMessage('Your journey through the Underground begins...');
+            addLog('You fell into the Underground. Can you reach the end?');
+            playMelody([[523, 0.2, 'sine'], [659, 0.2, 'sine'], [784, 0.3, 'sine']]);
+          };
+
+          const sacrifice = (member, epitaph) => {
+            setParty(prev => prev.map(p => {
+              if (p.name === member.name) {
+                return { ...p, health: 0, alive: false, epitaph: epitaph };
+              }
+              return p;
+            }));
+            
+            setDistance(prev => prev + 300);
+            setDetermination(prev => Math.max(0, prev - 30));
+            setMessage(`${member.name} was sacrificed. The party advances 300m through dark magic...`);
+            addLog(`${member.name} sacrificed. +300m. Determination -30. Epitaph: "${epitaph}"`);
+            setSacrificeMode(false);
+            setSelectedForSacrifice(null);
+            playSacrificeSound();
+            
+            checkGameOver();
+          };
+
+          const travel = () => {
+            const newDistance = distance + Math.floor(Math.random() * 15) + 10;
+            const newDay = day + 1;
+            const foodLoss = Math.floor(Math.random() * 3) + 2;
+            
+            setDistance(newDistance);
+            setDay(newDay);
+            setFood(prev => Math.max(0, prev - foodLoss));
+            
+            const aliveMembers = party.filter(p => p.alive);
+            if (aliveMembers.length > 0 && Math.random() < 0.3) {
+              const unlucky = aliveMembers[Math.floor(Math.random() * aliveMembers.length)];
+              const damage = Math.floor(Math.random() * 5) + 2;
+              damageMember(unlucky.name, damage);
+            }
+            
+            if (Math.random() < 0.4) {
+              const event = events[Math.floor(Math.random() * events.length)];
+              handleEvent(event);
+            } else if (Math.random() < 0.5) {
+              startEncounter();
+            } else {
+              setMessage('You travel safely through the caverns.');
+              addLog('Day ' + newDay + ': Traveled ' + (newDistance - distance) + ' meters.');
+            }
+            
+            checkGameOver();
+          };
+
+          const handleEvent = (event) => {
+            setMessage(event.text);
+            addLog(event.text);
+            
+            if (event.food) setFood(prev => Math.max(0, Math.min(200, prev + event.food)));
+            if (event.gold) setGold(prev => prev + event.gold);
+            if (event.determination) setDetermination(prev => Math.min(100, prev + event.determination));
+            
+            if (event.damage) {
+              if (event.member === 'all') {
+                party.forEach(p => {
+                  if (p.alive) damageMember(p.name, event.damage);
+                });
+              } else if (event.member === 'random') {
+                const alive = party.filter(p => p.alive);
+                if (alive.length > 0) {
+                  damageMember(alive[Math.floor(Math.random() * alive.length)].name, event.damage);
+                }
+              }
+            }
+            
+            if (event.heal) {
+              if (event.member === 'all') {
+                party.forEach(p => {
+                  if (p.alive) healMember(p.name, event.heal);
+                });
+              }
+            }
+          };
+
+          const damageMember = (name, damage) => {
+            setParty(prev => prev.map(p => {
+              if (p.name === name && p.alive) {
+                const newHealth = Math.max(0, p.health - damage);
+                if (newHealth === 0) {
+                  addLog(`${name} has died!`);
+                  return { ...p, health: 0, alive: false };
+                }
+                return { ...p, health: newHealth };
+              }
+              return p;
+            }));
+          };
+
+          const healMember = (name, amount) => {
+            setParty(prev => prev.map(p => {
+              if (p.name === name && p.alive) {
+                return { ...p, health: Math.min(100, p.health + amount) };
+              }
+              return p;
+            }));
+          };
+
+          const rest = () => {
+            const foodLoss = Math.floor(Math.random() * 5) + 3;
+            setFood(prev => Math.max(0, prev - foodLoss));
+            setDay(prev => prev + 1);
+            
+            party.forEach(p => {
+              if (p.alive) {
+                healMember(p.name, 15);
+              }
+            });
+            
+            setMessage('Everyone rests and recovers health.');
+            addLog('Rested. All members +15 health');
+            playSound(392, 0.3, 'sine', 0.12);
+            checkGameOver();
+          };
+
+          const startHunting = () => {
+            if (bullets < 10) {
+              setMessage('Not enough bullets! Need at least 10.');
+              return;
+            }
+            
+            huntStateRef.current = {
+              active: true,
+              hunterY: 200,
+              animals: [],
+              projectiles: [],
+              score: 0,
+              timeLeft: 30,
+              bullets: bullets
+            };
+            
+            setGameState('hunting');
+            
+            for (let i = 0; i < 3; i++) {
+              setTimeout(() => spawnAnimal(), i * 1000);
+            }
+            
+            const gameLoop = () => {
+              if (!huntStateRef.current.active) return;
+              
+              updateHunting();
+              animationFrameRef.current = requestAnimationFrame(gameLoop);
+            };
+            gameLoop();
+            
+            const timerInterval = setInterval(() => {
+              if (!huntStateRef.current.active) {
+                clearInterval(timerInterval);
+                return;
+              }
+              
+              huntStateRef.current.timeLeft--;
+              
+              if (huntStateRef.current.timeLeft <= 0) {
+                clearInterval(timerInterval);
+                endHunting();
+              }
+            }, 1000);
+            
+            const spawnInterval = setInterval(() => {
+              if (!huntStateRef.current.active) {
+                clearInterval(spawnInterval);
+                return;
+              }
+              spawnAnimal();
+            }, 2000);
+          };
+
+          const spawnAnimal = () => {
+            if (!huntStateRef.current.active) return;
+            
+            const types = ['rabbit', 'deer', 'bird'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            const newAnimal = {
+              id: Date.now() + Math.random(),
+              type,
+              x: 800,
+              y: Math.random() * 250 + 80,
+              speed: type === 'bird' ? 5 : type === 'rabbit' ? 4 : 3,
+              points: type === 'deer' ? 50 : type === 'rabbit' ? 30 : 20
+            };
+            huntStateRef.current.animals.push(newAnimal);
+          };
+
+          const updateHunting = () => {
+            const state = huntStateRef.current;
+            if (!state.active) return;
+            
+            if (keysPressed.current['ArrowUp']) {
+              state.hunterY = Math.max(50, state.hunterY - 5);
+            }
+            if (keysPressed.current['ArrowDown']) {
+              state.hunterY = Math.min(350, state.hunterY + 5);
+            }
+            
+            state.animals = state.animals.filter(a => {
+              a.x -= a.speed;
+              return a.x > -100;
+            });
+            
+            const newProjectiles = [];
+            state.projectiles.forEach(p => {
+              p.x += 12;
+              
+              if (p.x > 850) return;
+              
+              let hit = false;
+              state.animals = state.animals.filter(a => {
+                const dist = Math.sqrt(Math.pow(a.x - p.x, 2) + Math.pow(a.y - p.y, 2));
+                if (dist < 40) {
+                  state.score += a.points;
+                  playHitSound();
+                  hit = true;
+                  return false;
+                }
+                return true;
+              });
+              
+              if (!hit) {
+                newProjectiles.push(p);
+              }
+            });
+            state.projectiles = newProjectiles;
+            
+            if (huntCanvasRef.current) {
+              const canvas = huntCanvasRef.current;
+              const ctx = canvas.getContext('2d');
+              drawHunting(ctx, state);
+            }
+          };
+
+          const drawHunting = (ctx, state) => {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 800, 400);
+            
+            ctx.fillStyle = '#0f0';
+            ctx.font = '16px monospace';
+            
+            ctx.fillRect(0, 380, 800, 20);
+            
+            ctx.fillText('>', 20, state.hunterY);
+            ctx.fillText('O', 30, state.hunterY);
+            ctx.fillText('/|\\', 28, state.hunterY + 12);
+            ctx.fillText('/ \\', 28, state.hunterY + 24);
+            
+            ctx.font = '14px monospace';
+            state.animals.forEach(a => {
+              if (a.type === 'rabbit') {
+                ctx.fillText('(\\___/)', a.x, a.y);
+                ctx.fillText('(o.o)', a.x + 4, a.y + 12);
+                ctx.fillText('>   <', a.x + 2, a.y + 24);
+              } else if (a.type === 'deer') {
+                ctx.fillText('  ^ ^', a.x, a.y - 10);
+                ctx.fillText('(/o.o\\)', a.x, a.y + 2);
+                ctx.fillText(' | | |', a.x, a.y + 14);
+                ctx.fillText('/ \\ / \\', a.x - 2, a.y + 26);
+              } else {
+                ctx.fillText('\\o/', a.x, a.y);
+                ctx.fillText(' |', a.x + 4, a.y + 10);
+                ctx.fillText('/ \\', a.x + 2, a.y + 20);
+              }
+            });
+            
+            ctx.fillStyle = '#ff0';
+            ctx.font = '20px monospace';
+            state.projectiles.forEach(p => {
+              ctx.fillText('●', p.x, p.y);
+            });
+            
+            ctx.fillStyle = '#0f0';
+            ctx.font = '16px monospace';
+            ctx.fillText(`SCORE: ${state.score} lbs`, 10, 25);
+            ctx.fillText(`TIME: ${state.timeLeft}s`, 10, 45);
+            ctx.fillText(`BULLETS: ${state.bullets}`, 10, 65);
+          };
+
+          const endHunting = () => {
+            const state = huntStateRef.current;
+            state.active = false;
+            
+            if (animationFrameRef.current) {
+              cancelAnimationFrame(animationFrameRef.current);
+            }
+            
+            const foodGained = Math.floor(state.score / 2);
+            setFood(prev => Math.min(200, prev + foodGained));
+            setBullets(state.bullets);
+            setDay(prev => prev + 1);
+            setMessage(`Hunting complete! Gained ${foodGained} food from ${state.score} lbs of meat.`);
+            addLog(`Hunt: ${state.score}lbs = ${foodGained} food. Bullets: ${state.bullets} left.`);
+            setGameState('traveling');
+            playMelody([[392, 0.15, 'triangle'], [440, 0.15, 'triangle'], [523, 0.2, 'triangle']]);
+            checkGameOver();
+          };
+
+          const trade = () => {
+            if (gold >= 10) {
+              setGold(prev => prev - 10);
+              setFood(prev => Math.min(200, prev + 20));
+              setMessage('You bought 20 food for 10 gold.');
+              addLog('Traded 10 gold for 20 food.');
+              playSound(523, 0.2, 'sine', 0.15);
+            } else {
+              setMessage('Not enough gold! Need 10 gold.');
+              playSound(200, 0.3, 'sawtooth', 0.15);
+            }
+          };
+
+          const startEncounter = () => {
+            const enemy = enemies[Math.floor(Math.random() * enemies.length)];
+            setEncounter(enemy);
+            setEnemyHealth(enemy.health);
+            setMercyChance(0);
+            setCombatPhase('choice');
+            setActChoices([]);
+            setGameState('encounter');
+            setMessage(enemy.intro);
+            addLog(`Encountered ${enemy.name}!`);
+          };
+
+          const fight = () => {
+            const damage = Math.floor(Math.random() * 15) + 10;
+            const newEnemyHealth = Math.max(0, enemyHealth - damage);
+            setEnemyHealth(newEnemyHealth);
+            setMessage(`You dealt ${damage} damage!`);
+            playAttackSound();
+            
+            if (newEnemyHealth <= 0) {
+              const goldGain = Math.floor(Math.random() * 10) + 5;
+              setGold(prev => prev + goldGain);
+              setDetermination(prev => Math.max(0, prev - 10));
+              addLog(`Defeated ${encounter.name}. Gold +${goldGain}. Determination -10`);
+              setMessage(`You defeated ${encounter.name}. Gained ${goldGain} gold.`);
+              playMelody([[392, 0.1, 'sawtooth'], [330, 0.1, 'sawtooth'], [262, 0.2, 'sawtooth']]);
+              setTimeout(() => {
+                setGameState('traveling');
+                setEncounter(null);
+              }, 2000);
+            } else {
+              setCombatPhase('enemy');
+              setTimeout(enemyAttack, 1500);
+            }
+          };
+
+          const act = (action) => {
+            const mercyGain = action.amount;
+            setMessage(action.text);
+            setMercyChance(prev => Math.min(100, prev + Math.max(0, mercyGain)));
+            playActSound();
+            
+            if (action.name === 'Eat Greens') {
+              const alive = party.filter(p => p.alive);
+              if (alive.length > 0) {
+                healMember(alive[0].name, 10);
+              }
+            }
+            
+            setActChoices([]);
+            setCombatPhase('enemy');
+            setTimeout(enemyAttack, 1500);
+          };
+
+          const mercy = () => {
+            if (encounter.noMercy) {
+              setMessage(`${encounter.name} REFUSES mercy! This enemy cannot be spared!`);
+              playSound(200, 0.3, 'sawtooth', 0.15);
+              setCombatPhase('enemy');
+              setTimeout(enemyAttack, 1500);
+              return;
+            }
+            
+            if (mercyChance >= 60) {
+              setDetermination(prev => Math.min(100, prev + 15));
+              addLog(`Spared ${encounter.name}. Determination +15`);
+              setMessage(encounter.spareText);
+              playMercySound();
+              setTimeout(() => {
+                setGameState('traveling');
+                setEncounter(null);
+              }, 2000);
+            } else {
+              setMessage(`${encounter.name} doesn't want mercy yet! (Need ${60 - mercyChance}% more)`);
+              playSound(200, 0.2, 'sawtooth', 0.12);
+              setCombatPhase('enemy');
+              setTimeout(enemyAttack, 1500);
+            }
+          };
+
+          const enemyAttack = () => {
+            const alive = party.filter(p => p.alive);
+            if (alive.length === 0) return;
+            
+            const target = alive[Math.floor(Math.random() * alive.length)];
+            const damage = Math.floor(Math.random() * encounter.attack) + 3;
+            const attackMsg = encounter.attacks[Math.floor(Math.random() * encounter.attacks.length)];
+            
+            damageMember(target.name, damage);
+            setMessage(`${attackMsg} ${target.name} takes ${damage} damage!`);
+            
+            if (encounter.name === 'Pizzaroni' && attackMsg === 'Toast!') {
+              playToastSound();
+            } else {
+              playSound(250, 0.2, 'sawtooth', 0.12);
+            }
+            
+            setTimeout(() => {
+              checkGameOver();
+              if (party.some(p => p.alive)) {
+                setCombatPhase('choice');
+                setMessage('What will you do?');
+              }
+            }, 1500);
+          };
+
+          const checkGameOver = () => {
+            const anyAlive = party.some(p => p.alive);
+            
+            if (!anyAlive) {
+              setGameState('gameover');
+              setMessage('Your entire party has perished...');
+              playMelody([[392, 0.2, 'sine'], [349, 0.2, 'sine'], [330, 0.2, 'sine'], [294, 0.4, 'sine']]);
+            } else if (food <= 0) {
+              setGameState('gameover');
+              setMessage('Your party starved in the Underground...');
+              playMelody([[392, 0.2, 'sine'], [349, 0.2, 'sine'], [330, 0.2, 'sine'], [294, 0.4, 'sine']]);
+            } else if (distance >= 1200) {
+              setGameState('victory');
+              const alivePct = party.filter(p => p.alive).length / party.length * 100;
+              if (determination >= 70 && alivePct === 100) {
+                setMessage('Everyone escaped with their souls intact! TRUE ENDING');
+              } else if (alivePct >= 50) {
+                setMessage('Some of you made it out... NEUTRAL ENDING');
+              } else {
+                setMessage('You escaped alone... HOLLOW ENDING');
+              }
+              playMelody([[523, 0.2, 'triangle'], [659, 0.2, 'triangle'], [784, 0.2, 'triangle'], [1047, 0.4, 'triangle']]);
+            }
+          };
+
+          const restart = () => {
+            setGameState('title');
+            setProfession('');
+            setPartyNames(['', '', '', '']);
+            setParty([]);
+            setDay(1);
+            setDistance(0);
+            setFood(0);
+            setGold(0);
+            setBullets(0);
+            setDetermination(50);
+            setMessage('');
+            setEncounter(null);
+            setGameLog([]);
+            setSacrificeMode(false);
+            setSelectedForSacrifice(null);
+          };
+
+          return (
+            <div className="w-full min-h-screen bg-black flex items-center justify-center p-4" style={{fontFamily: 'monospace'}}>
+              <div className="w-full max-w-4xl bg-black border-4 border-green-500 p-6" style={{boxShadow: '0 0 20px #0f0'}}>
+                
+                {gameState === 'title' && (
+                  <div className="text-green-500 text-center">
+                    <pre className="text-xl mb-4">
+{`
+ ██╗   ██╗███╗   ██╗██████╗ ███████╗██████╗ 
+ ██║   ██║████╗  ██║██╔══██╗██╔════╝██╔══██╗
+ ██║   ██║██╔██╗ ██║██║  ██║█████╗  ██████╔╝
+ ██║   ██║██║╚██╗██║██║  ██║██╔══╝  ██╔══██╗
+ ╚██████╔╝██║ ╚████║██████╔╝███████╗██║  ██║
+  ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚══════╝╚═╝  ╚═╝
+          ████████╗██████╗  █████╗ ██╗██╗     
+          ╚══██╔══╝██╔══██╗██╔══██╗██║██║     
+             ██║   ██████╔╝███████║██║██║     
+             ██║   ██╔══██╗██╔══██║██║██║     
+             ██║   ██║  ██║██║  ██║██║███████╗
+             ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚══════╝
+`}
+                    </pre>
+                    <p className="text-xl mb-4">A Journey Through the Underground</p>
+                    <div className="mb-6">
+                      <label className="flex items-center justify-center gap-2 text-sm">
+                        <input 
+                          type="checkbox" 
+                          checked={musicEnabled}
+                          onChange={(e) => setMusicEnabled(e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        Enable Sound Effects
+                      </label>
+                    </div>
+                    <button 
+                      onClick={() => setGameState('setup')}
+                      className="bg-green-500 text-black px-8 py-3 text-xl hover:bg-green-400 border-2 border-green-300"
+                    >
+                      ► START GAME
+                    </button>
+                  </div>
+                )}
+
+                {gameState === 'setup' && (
+                  <div className="text-green-500">
+                    <h2 className="text-2xl mb-4 text-center">◆ CHARACTER CREATION ◆</h2>
+                    
+                    <div className="mb-6">
+                      <p className="mb-2">Choose your profession:</p>
+                      <div className="space-y-2">
+                        <button 
+                          onClick={() => setProfession('banker')}
+                          className={`w-full p-3 border ${profession === 'banker' ? 'bg-green-700 border-green-300' : 'bg-green-900 border-green-500'}`}
+                        >
+                          BANKER - Start with 100 gold, 60 food, 50 bullets (1x points)
+                        </button>
+                        <button 
+                          onClick={() => setProfession('carpenter')}
+                          className={`w-full p-3 border ${profession === 'carpenter' ? 'bg-green-700 border-green-300' : 'bg-green-900 border-green-500'}`}
+                        >
+                          CARPENTER - Start with 50 gold, 50 food, 50 bullets (2x points)
+                        </button>
+                        <button 
+                          onClick={() => setProfession('farmer')}
+                          className={`w-full p-3 border ${profession === 'farmer' ? 'bg-green-700 border-green-300' : 'bg-green-900 border-green-500'}`}
+                        >
+                          FARMER - Start with 30 gold, 80 food, 40 bullets (3x points)
+                        </button>
+                      </div>
+                    </div>
+
+                    {profession && (
+                      <div className="mb-6">
+                        <p className="mb-2">Name your party members:</p>
+                        <div className="space-y-2">
+                          {[0, 1, 2, 3].map(i => (
+                            <input
+                              key={i}
+                              type="text"
+                              placeholder={`Party Member ${i + 1}`}
+                              maxLength={15}
+                              value={partyNames[i]}
+                              onChange={(e) => {
+                                const newNames = [...partyNames];
+                                newNames[i] = e.target.value;
+                                setPartyNames(newNames);
+                              }}
+                              className="w-full p-2 bg-black border border-green-500 text-green-500"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {profession && (
+                      <button 
+                        onClick={startGame}
+                        className="w-full bg-green-500 text-black px-8 py-3 text-xl hover:bg-green-400 border-2 border-green-300"
+                      >
+                        ► BEGIN JOURNEY
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {gameState === 'traveling' && (
+                  <div className="text-green-500">
+                    <div className="grid grid-cols-4 gap-2 mb-4 text-sm">
+                      <div>DAY: {day}</div>
+                      <div>DISTANCE: {distance}/1200m</div>
+                      <div>FOOD: {food}</div>
+                      <div>GOLD: {gold}</div>
+                    </div>
+                    <div className="mb-2 text-sm">BULLETS: {bullets} | DETERMINATION: {determination}/100</div>
+                    
+                    <div className="grid grid-cols-4 gap-2 mb-4 text-xs">
+                      {party.map((p, i) => (
+                        <div key={i} className={`border p-2 ${p.alive ? 'border-green-500' : 'border-red-500'}`}>
+                          <div className="truncate">{p.name}</div>
+                          <div>HP: {p.health}/100</div>
+                          <div>{p.alive ? '♥ ALIVE' : '☠ DEAD'}</div>
+                          {p.epitaph && <div className="text-xs mt-1 italic">"{p.epitaph}"</div>}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <canvas ref={canvasRef} width="800" height="200" className="w-full border border-green-500 mb-4" />
+                    
+                    <div className="border border-green-500 p-4 mb-4 h-24 overflow-y-auto text-sm">
+                      {gameLog.map((log, i) => (
+                        <div key={i}>&gt; {log}</div>
+                      ))}
+                      {message && <div className="text-green-300">&gt; {message}</div>}
+                    </div>
+                    
+                    {!sacrificeMode && !selectedForSacrifice && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <button onClick={travel} className="bg-green-700 hover:bg-green-600 p-3 border border-green-500">
+                          [T]RAVEL
+                        </button>
+                        <button onClick={rest} className="bg-green-700 hover:bg-green-600 p-3 border border-green-500">
+                          [R]EST
+                        </button>
+                        <button onClick={startHunting} className="bg-green-700 hover:bg-green-600 p-3 border border-green-500">
+                          [H]UNT (needs 10 bullets)
+                        </button>
+                        <button onClick={trade} className="bg-green-700 hover:bg-green-600 p-3 border border-green-500">
+                          [B]UY FOOD (10 gold)
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const alive = party.filter(p => p.alive);
+                            if (alive.length <= 1) {
+                              setMessage('You need at least 2 alive members to sacrifice one!');
+                              playSound(200, 0.3, 'sawtooth', 0.15);
+                            } else if (determination < 30) {
+                              setMessage('Not enough determination! You need at least 30 determination to sacrifice.');
+                              playSound(200, 0.3, 'sawtooth', 0.15);
+                            } else {
+                              setSacrificeMode(true);
+                              setMessage('Choose who to sacrifice for 300m advancement...');
+                            }
+                          }}
+                          className="bg-purple-900 hover:bg-purple-800 p-3 border border-purple-500 col-span-2"
+                        >
+                          [S]ACRIFICE (+300m, -30 determination, needs 30 det)
+                        </button>
+                      </div>
+                    )}
+                    
+                    {sacrificeMode && !selectedForSacrifice && (
+                      <div>
+                        <p className="text-center mb-3 text-yellow-400">⚠ Choose a party member to sacrifice ⚠</p>
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          {party.filter(p => p.alive).map((p, i) => (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                setSelectedForSacrifice(p);
+                                setMessage(`Choose an epitaph for ${p.name}...`);
+                              }}
+                              className="bg-red-900 hover:bg-red-800 p-3 border border-red-500"
+                            >
+                              {p.name} (HP: {p.health})
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSacrificeMode(false);
+                            setMessage('Sacrifice cancelled.');
+                          }}
+                          className="w-full bg-gray-700 hover:bg-gray-600 p-2 border border-gray-500"
+                        >
+                          « CANCEL
+                        </button>
+                      </div>
+                    )}
+                    
+                    {selectedForSacrifice && (
+                      <div>
+                        <p className="text-center mb-3 text-red-400">Choose {selectedForSacrifice.name}'s epitaph:</p>
+                        <div className="grid grid-cols-1 gap-2 mb-3 max-h-64 overflow-y-auto">
+                          {epitaphChoices.map((epitaph, i) => (
+                            <button
+                              key={i}
+                              onClick={() => sacrifice(selectedForSacrifice, epitaph)}
+                              className="bg-purple-900 hover:bg-purple-800 p-2 border border-purple-500 text-sm text-left"
+                            >
+                              "{epitaph}"
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedForSacrifice(null);
+                            setMessage('Choose who to sacrifice...');
+                          }}
+                          className="w-full bg-gray-700 hover:bg-gray-600 p-2 border border-gray-500"
+                        >
+                          « BACK
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {gameState === 'hunting' && (
+                  <div className="text-green-500">
+                    <h2 className="text-xl mb-2 text-center">◆ HUNTING ◆</h2>
+                    <p className="text-sm mb-2 text-center">Arrow Keys = Move | Spacebar = Shoot</p>
+                    <canvas ref={huntCanvasRef} width="800" height="400" className="w-full border border-green-500 mb-2" />
+                    <div className="text-center">
+                      <button 
+                        onClick={endHunting}
+                        className="bg-red-700 hover:bg-red-600 px-6 py-2 border border-red-500"
+                      >
+                        END HUNTING
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {gameState === 'encounter' && encounter && (
+                  <div className="text-green-500 text-center">
+                    <div className="text-6xl mb-4">{encounter.ascii}</div>
+                    <h2 className="text-2xl mb-2">{encounter.name}</h2>
+                    {encounter.noMercy && <p className="text-red-500 font-bold mb-2">⚠ NO MERCY ⚠</p>}
+                    <div className="mb-4">
+                      <div>ENEMY HP: {enemyHealth}/{encounter.health}</div>
+                      <div>MERCY: {mercyChance}%</div>
+                    </div>
+                    
+                    <div className="border border-green-500 p-4 mb-4 h-24 overflow-y-auto text-sm">
+                      {message}
+                    </div>
+                    
+                    {combatPhase === 'choice' && actChoices.length === 0 && (
+                      <div className="grid grid-cols-3 gap-4">
+                        <button onClick={fight} className="bg-red-700 hover:bg-red-600 p-3 border border-red-500">
+                          ★ FIGHT
+                        </button>
+                        <button onClick={() => setActChoices(encounter.actOptions)} className="bg-blue-700 hover:bg-blue-600 p-3 border border-blue-500">
+                          ☼ ACT
+                        </button>
+                        <button onClick={mercy} className="bg-yellow-700 hover:bg-yellow-600 p-3 border border-yellow-500">
+                          ♥ MERCY
+                        </button>
+                      </div>
+                    )}
+                    
+                    {actChoices.length > 0 && (
+                      <div>
+                        <p className="mb-3 text-sm">Choose an action:</p>
+                        <div className="grid grid-cols-1 gap-2">
+                          {actChoices.map((action, i) => (
+                            <button 
+                              key={i}
+                              onClick={() => act(action)}
+                              className="bg-green-700 hover:bg-green-600 p-3 border border-green-500 text-sm"
+                            >
+                              * {action.name}
+                            </button>
+                          ))}
+                          <button 
+                            onClick={() => {
+                              setActChoices([]);
+                              setMessage('What will you do?');
+                            }}
+                            className="bg-gray-700 hover:bg-gray-600 p-2 border border-gray-500 text-xs"
+                          >
+                            « BACK
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(gameState === 'gameover' || gameState === 'victory') && (
+                  <div className="text-green-500 text-center">
+                    <h1 className="text-4xl mb-8">
+                      {gameState === 'victory' ? '★ VICTORY ★' : '☠ GAME OVER ☠'}
+                    </h1>
+                    <p className="text-xl mb-4">{message}</p>
+                    <div className="mb-4">
+                      <div>Days Survived: {day}</div>
+                      <div>Distance Traveled: {distance}m</div>
+                      <div>Final Determination: {determination}</div>
+                    </div>
+                    <div className="mb-8">
+                      <h3 className="text-lg mb-2">Party Status:</h3>
+                      {party.map((p, i) => (
+                        <div key={i} className={p.alive ? 'text-green-400' : 'text-red-400'}>
+                          {p.name}: {p.alive ? `Survived (${p.health} HP)` : p.epitaph ? `Sacrificed - "${p.epitaph}"` : 'Perished'}
+                        </div>
+                      ))}
+                    </div>
+                    <button 
+                      onClick={restart}
+                      className="bg-green-500 text-black px-8 py-3 text-xl hover:bg-green-400 border-2 border-green-300"
+                    >
+                      ► TRY AGAIN
+                    </button>
+                  </div>
+                )}
+                
+              </div>
+            </div>
+          );
+        };
+
+        ReactDOM.render(<UnderTrail />, document.getElementById('root'));
+    </script>
+</body>
+</html>
