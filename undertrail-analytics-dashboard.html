@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnderTrail Analytics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8a 100%);
+            border: 2px solid #3b82f6;
+            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+        }
+        .chart-container {
+            background: rgba(30, 58, 95, 0.5);
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const API_BASE_URL = 'https://en0u4vddgd.execute-api.us-west-2.amazonaws.com/prod';
+
+        const AnalyticsDashboard = () => {
+            const [analytics, setAnalytics] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+            const [lastRefresh, setLastRefresh] = useState(new Date());
+
+            const fetchAnalytics = async () => {
+                setLoading(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/analytics`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        setAnalytics(data.analytics);
+                        setLastRefresh(new Date());
+                        setError(null);
+                    } else {
+                        setError('Failed to fetch analytics');
+                    }
+                } catch (err) {
+                    setError('Network error: ' + err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => {
+                fetchAnalytics();
+            }, []);
+
+            useEffect(() => {
+                if (!analytics) return;
+
+                // Country Chart
+                const countryCtx = document.getElementById('countryChart');
+                if (countryCtx) {
+                    const countries = Object.entries(analytics.byCountry)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 10);
+                    
+                    new Chart(countryCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: countries.map(([country]) => country),
+                            datasets: [{
+                                label: 'Players by Country',
+                                data: countries.map(([, count]) => count),
+                                backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: { 
+                                    beginAtZero: true,
+                                    ticks: { color: '#60a5fa' },
+                                    grid: { color: 'rgba(96, 165, 250, 0.1)' }
+                                },
+                                x: { 
+                                    ticks: { color: '#60a5fa' },
+                                    grid: { color: 'rgba(96, 165, 250, 0.1)' }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Device Chart
+                const deviceCtx = document.getElementById('deviceChart');
+                if (deviceCtx) {
+                    new Chart(deviceCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Desktop', 'Mobile', 'Tablet', 'Unknown'],
+                            datasets: [{
+                                data: [
+                                    analytics.byDevice.desktop,
+                                    analytics.byDevice.mobile,
+                                    analytics.byDevice.tablet,
+                                    analytics.byDevice.unknown
+                                ],
+                                backgroundColor: [
+                                    'rgba(59, 130, 246, 0.8)',
+                                    'rgba(16, 185, 129, 0.8)',
+                                    'rgba(245, 158, 11, 0.8)',
+                                    'rgba(239, 68, 68, 0.8)'
+                                ],
+                                borderColor: [
+                                    'rgba(59, 130, 246, 1)',
+                                    'rgba(16, 185, 129, 1)',
+                                    'rgba(245, 158, 11, 1)',
+                                    'rgba(239, 68, 68, 1)'
+                                ],
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { color: '#60a5fa' }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Profession Chart
+                const professionCtx = document.getElementById('professionChart');
+                if (professionCtx) {
+                    new Chart(professionCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Banker', 'Carpenter', 'Farmer'],
+                            datasets: [{
+                                label: 'Players by Profession',
+                                data: [
+                                    analytics.byProfession.banker,
+                                    analytics.byProfession.carpenter,
+                                    analytics.byProfession.farmer
+                                ],
+                                backgroundColor: [
+                                    'rgba(251, 191, 36, 0.6)',
+                                    'rgba(139, 92, 46, 0.6)',
+                                    'rgba(34, 197, 94, 0.6)'
+                                ],
+                                borderColor: [
+                                    'rgba(251, 191, 36, 1)',
+                                    'rgba(139, 92, 46, 1)',
+                                    'rgba(34, 197, 94, 1)'
+                                ],
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: { 
+                                    beginAtZero: true,
+                                    ticks: { color: '#60a5fa' },
+                                    grid: { color: 'rgba(96, 165, 250, 0.1)' }
+                                },
+                                x: { 
+                                    ticks: { color: '#60a5fa' },
+                                    grid: { color: 'rgba(96, 165, 250, 0.1)' }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Ending Chart
+                const endingCtx = document.getElementById('endingChart');
+                if (endingCtx) {
+                    new Chart(endingCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['TRUE Ending', 'NEUTRAL Ending', 'HOLLOW Ending'],
+                            datasets: [{
+                                data: [
+                                    analytics.byEnding.TRUE,
+                                    analytics.byEnding.NEUTRAL,
+                                    analytics.byEnding.HOLLOW
+                                ],
+                                backgroundColor: [
+                                    'rgba(251, 191, 36, 0.8)',
+                                    'rgba(59, 130, 246, 0.8)',
+                                    'rgba(220, 38, 38, 0.8)'
+                                ],
+                                borderColor: [
+                                    'rgba(251, 191, 36, 1)',
+                                    'rgba(59, 130, 246, 1)',
+                                    'rgba(220, 38, 38, 1)'
+                                ],
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { color: '#60a5fa' }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [analytics]);
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-blue-400 text-2xl">Loading analytics...</div>
+                    </div>
+                );
+            }
+
+            if (error) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-red-400 text-xl">
+                            <div className="mb-4">Error: {error}</div>
+                            <button 
+                                onClick={fetchAnalytics}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (!analytics) return null;
+
+            return (
+                <div className="min-h-screen p-6">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <div className="mb-8">
+                            <h1 className="text-4xl font-bold text-blue-400 mb-2">
+                                UnderTrail Analytics Dashboard
+                            </h1>
+                            <div className="flex justify-between items-center">
+                                <p className="text-blue-300">
+                                    Last updated: {lastRefresh.toLocaleString()}
+                                </p>
+                                <button 
+                                    onClick={fetchAnalytics}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+                                >
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Stats Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div className="stat-card p-6 rounded-lg">
+                                <div className="text-blue-300 text-sm mb-2">Total Players</div>
+                                <div className="text-4xl font-bold text-white">{analytics.totalPlayers}</div>
+                            </div>
+                            
+                            <div className="stat-card p-6 rounded-lg">
+                                <div className="text-blue-300 text-sm mb-2">Countries</div>
+                                <div className="text-4xl font-bold text-white">
+                                    {Object.keys(analytics.byCountry).length}
+                                </div>
+                            </div>
+                            
+                            <div className="stat-card p-6 rounded-lg">
+                                <div className="text-blue-300 text-sm mb-2">TRUE Endings</div>
+                                <div className="text-4xl font-bold text-yellow-400">
+                                    {analytics.byEnding.TRUE}
+                                </div>
+                            </div>
+                            
+                            <div className="stat-card p-6 rounded-lg">
+                                <div className="text-blue-300 text-sm mb-2">Mobile Players</div>
+                                <div className="text-4xl font-bold text-green-400">
+                                    {analytics.byDevice.mobile}
+                                </div>
+                            </div>
+                            <div className="stat-card p-6 rounded-lg">
+                                <div className="text-blue-300 text-sm mb-2">Total Visits</div>
+                                <div className="text-4xl font-bold text-white">{analytics.totalVisits}</div>
+                            </div>
+
+                            <div className="stat-card p-6 rounded-lg">
+                                <div className="text-blue-300 text-sm mb-2">Games Started</div>
+                                <div className="text-4xl font-bold text-white">{analytics.totalGameStarts}</div>
+                            </div>
+
+                            <div className="stat-card p-6 rounded-lg">
+                                <div className="text-blue-300 text-sm mb-2">Completion Rate</div>
+                                <div className="text-4xl font-bold text-green-400">{analytics.conversionRate}%</div>
+                            </div>
+                        </div>
+
+                        {/* Charts Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                            {/* Country Chart */}
+                            <div className="chart-container">
+                                <h3 className="text-xl font-bold text-blue-400 mb-4">
+                                    Top 10 Countries
+                                </h3>
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="countryChart"></canvas>
+                                </div>
+                            </div>
+
+                            {/* Device Chart */}
+                            <div className="chart-container">
+                                <h3 className="text-xl font-bold text-blue-400 mb-4">
+                                    Device Types
+                                </h3>
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="deviceChart"></canvas>
+                                </div>
+                            </div>
+
+                            {/* Profession Chart */}
+                            <div className="chart-container">
+                                <h3 className="text-xl font-bold text-blue-400 mb-4">
+                                    Professions Chosen
+                                </h3>
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="professionChart"></canvas>
+                                </div>
+                            </div>
+
+                            {/* Ending Chart */}
+                            <div className="chart-container">
+                                <h3 className="text-xl font-bold text-blue-400 mb-4">
+                                    Game Endings
+                                </h3>
+                                <div style={{ height: '300px' }}>
+                                    <canvas id="endingChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Top Cities */}
+                        <div className="chart-container mb-8">
+                            <h3 className="text-xl font-bold text-blue-400 mb-4">
+                                Top 10 Cities
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                {Object.entries(analytics.byCity).map(([city, count]) => (
+                                    <div key={city} className="text-center">
+                                        <div className="text-2xl font-bold text-white">{count}</div>
+                                        <div className="text-blue-300 text-sm">{city}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Referrer Sources */}
+                        <div className="chart-container mb-8">
+                            <h3 className="text-xl font-bold text-blue-400 mb-4">
+                                Traffic Sources
+                            </h3>
+                            <div className="space-y-2">
+                                {Object.entries(analytics.byReferrer)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .slice(0, 10)
+                                    .map(([referrer, count]) => (
+                                        <div key={referrer} className="flex justify-between items-center p-3 bg-blue-900 bg-opacity-30 rounded">
+                                            <span className="text-blue-300 truncate">{referrer}</span>
+                                            <span className="text-white font-bold ml-4">{count}</span>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+
+                        {/* Recent Players */}
+                        <div className="chart-container">
+                            <h3 className="text-xl font-bold text-blue-400 mb-4">
+                                Recent Players (Last 20)
+                            </h3>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-blue-700">
+                                            <th className="p-3 text-blue-300">Player</th>
+                                            <th className="p-3 text-blue-300">Score</th>
+                                            <th className="p-3 text-blue-300">Location</th>
+                                            <th className="p-3 text-blue-300">Device</th>
+                                            <th className="p-3 text-blue-300">Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {analytics.recentPlayers.map((player, i) => (
+                                            <tr key={i} className="border-b border-blue-800 hover:bg-blue-900 hover:bg-opacity-20">
+                                                <td className="p-3 text-white">{player.playerName}</td>
+                                                <td className="p-3 text-blue-300">{player.score}</td>
+                                                <td className="p-3 text-blue-300">
+                                                    {player.city}, {player.country}
+                                                </td>
+                                                <td className="p-3 text-blue-300 capitalize">{player.deviceType}</td>
+                                                <td className="p-3 text-blue-300 text-sm">
+                                                    {new Date(player.timestamp).toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AnalyticsDashboard />);
+    </script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</body>
+</html>
