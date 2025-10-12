@@ -26,6 +26,21 @@
         // API Configuration
         const API_BASE_URL = 'https://en0u4vddgd.execute-api.us-west-2.amazonaws.com/prod';
 
+        const trackEvent = async (action) => {
+          try {
+              await fetch(`${API_BASE_URL}/track`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action })
+              });
+          } catch (error) {
+              console.log('Tracking error:', error);
+          }
+        };
+
+        // Track page load
+        trackEvent('page_load');
+
         const UnderTrail = () => {
           const [gameState, setGameState] = useState('title');
           const [profession, setProfession] = useState('');
