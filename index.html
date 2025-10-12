@@ -38,10 +38,10 @@
           }
         };
 
-        // Track page load
-        trackEvent('page_load');
-
         const UnderTrail = () => {
+          // Track page load
+          trackEvent('page_load');
+          trackEvent('title_screen');
           const [gameState, setGameState] = useState('title');
           const [profession, setProfession] = useState('');
           const [partyNames, setPartyNames] = useState(['', '', '', '']);
@@ -466,6 +466,21 @@
             }
           }, [gameState, distance, day]);
 
+          useEffect(() => {
+              const handleBeforeUnload = (e) => {
+                  // Only track if they're actively playing (not on title screen or game over)
+                  if (gameState === 'traveling' || gameState === 'encounter' || gameState === 'hunting') {
+                      trackEvent('game_abandoned');
+                  }
+              };
+              
+              window.addEventListener('beforeunload', handleBeforeUnload);
+              
+              return () => {
+                  window.removeEventListener('beforeunload', handleBeforeUnload);
+              };
+          }, [gameState]); // Re-run when gameState changes
+
           const drawTravelScreen = (ctx) => {
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, 800, 200);
@@ -488,6 +503,7 @@
           };
 
           const startGame = () => {
+            trackEvent('game_start');
             const prof = professions[profession];
             const newParty = partyNames.map((name, i) => ({
               name: name || `Person ${i + 1}`,
@@ -497,6 +513,7 @@
             }));
             
             setParty(newParty);
+            trackEvent('setup_complete');
             setFood(prof.food);
             setGold(prof.gold);
             setBullets(prof.bullets);
