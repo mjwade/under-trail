@@ -37,10 +37,11 @@
               console.log('Tracking error:', error);
           }
         };
+        trackEvent('page_load');
+
 
         const UnderTrail = () => {
           // Track page load
-          trackEvent('page_load');
           trackEvent('title_screen');
           const [gameState, setGameState] = useState('title');
           const [profession, setProfession] = useState('');
