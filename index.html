@@ -56,6 +56,7 @@
           const [message, setMessage] = useState('');
           const [encounter, setEncounter] = useState(null);
           const [combatPhase, setCombatPhase] = useState('choice');
+          const [combatEnded, setCombatEnded] = useState(false);
           const [enemyHealth, setEnemyHealth] = useState(100);
           const [mercyChance, setMercyChance] = useState(0);
           const [gameLog, setGameLog] = useState([]);
@@ -841,6 +842,7 @@
             setEnemyHealth(enemy.health);
             setMercyChance(0);
             setCombatPhase('choice');
+            setCombatEnded(false);
             setActChoices([]);
             setGameState('encounter');
             setMessage(enemy.intro);
@@ -848,6 +850,7 @@
           };
 
           const fight = () => {
+            if (combatEnded) return;
             const damage = Math.floor(Math.random() * 15) + 10;
             const newEnemyHealth = Math.max(0, enemyHealth - damage);
             setEnemyHealth(newEnemyHealth);
@@ -855,6 +858,7 @@
             playAttackSound();
             
             if (newEnemyHealth <= 0) {
+              setCombatEnded(true);
               const goldGain = Math.floor(Math.random() * 10) + 5;
               setGold(prev => prev + goldGain);
               setDetermination(prev => Math.max(0, prev - 10));
@@ -872,6 +876,7 @@
           };
 
           const act = (action) => {
+            if (combatEnded) return;
             const mercyGain = action.amount;
             setMessage(action.text);
             setMercyChance(prev => Math.min(100, prev + Math.max(0, mercyGain)));
@@ -890,6 +895,7 @@
           };
 
           const mercy = () => {
+            if (combatEnded) return;
             if (encounter.noMercy) {
               setMessage(`${encounter.name} REFUSES mercy! This enemy cannot be spared!`);
               playSound(200, 0.3, 'sawtooth', 0.15);
