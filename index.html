@@ -562,9 +562,12 @@
           const continueAfterMessage = (callback) => {
             const delay = getAutoAdvanceDelay();
             if (delay === null) {
-              setWaitingForContinue(true);
-              // Store callback for manual continue button
-              window.pendingContinue = callback;
+              // Use setTimeout to ensure state updates properly
+              setTimeout(() => {
+                setWaitingForContinue(true);
+                // Store callback for manual continue button
+                window.pendingContinue = callback;
+              }, 0);
             } else {
               setTimeout(callback, delay);
             }
