@@ -436,7 +436,7 @@
               keysPressed.current[e.key] = true;
               
               // Handle spacebar for continue button
-              if (e.key === ' ' && waitingForContinue && gameState === 'traveling') {
+              if (e.key === ' ' && waitingForContinue && (gameState === 'traveling' || gameState === 'encounter')) {
                 e.preventDefault();
                 handleContinue();
                 return;
